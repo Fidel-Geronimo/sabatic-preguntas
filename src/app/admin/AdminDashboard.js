@@ -13,6 +13,8 @@ export default function AdminDashboard() {
   const [creating, setCreating]       = useState(false)
   const [createdRoom, setCreatedRoom] = useState(null)
   const [copied, setCopied]           = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null) // código de la sala a confirmar
+  const [deleting, setDeleting]       = useState(false)
   const router = useRouter()
 
   const loadRooms = useCallback(async () => {
@@ -69,6 +71,17 @@ export default function AdminDashboard() {
       setMessages(prev => prev.filter(m => m.id !== id))
       setSelectedRoom(prev => ({ ...prev, message_count: prev.message_count - 1 }))
     }
+  }
+
+  // Elimina la sala y todas sus preguntas (cascada en la base de datos)
+  async function handleDeleteRoom(code) {
+    setDeleting(true)
+    const res = await fetch(`/api/rooms/${code}`, { method: 'DELETE' })
+    if (res.ok) {
+      setRooms(prev => prev.filter(r => r.code !== code))
+      setConfirmDelete(null)
+    }
+    setDeleting(false)
   }
 
   function getShareUrl(code) {
@@ -284,29 +297,69 @@ export default function AdminDashboard() {
               {rooms.map(room => (
                 <div
                   key={room.id}
-                  className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3"
+                  className="bg-white rounded-xl shadow-sm p-4"
                 >
-                  <div
-                    className="flex-1 min-w-0 cursor-pointer"
-                    onClick={() => goToRoom(room)}
-                  >
-                    <p className="font-semibold text-gray-800 truncate">{room.name}</p>
-                    <p className="text-sm text-amber-600">
-                      {room.message_count} pregunta{room.message_count !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => copyLink(room.code)}
-                    className="shrink-0 text-xs border border-gray-200 text-gray-500 px-3 py-2 rounded-lg hover:bg-gray-50 transition"
-                  >
-                    {copied ? '✓' : '🔗'}
-                  </button>
-                  <button
-                    onClick={() => goToRoom(room)}
-                    className="shrink-0 text-xs bg-amber-100 text-amber-700 px-3 py-2 rounded-lg hover:bg-amber-200 transition font-medium"
-                  >
-                    Ver
-                  </button>
+                  {confirmDelete === room.code ? (
+                    // ── Confirmación de borrado
+                    <div>
+                      <p className="text-sm text-gray-700 font-medium mb-1">
+                        ¿Borrar «{room.name}»?
+                      </p>
+                      <p className="text-xs text-gray-400 mb-3">
+                        Se eliminarán también sus {room.message_count} pregunta
+                        {room.message_count !== 1 ? 's' : ''}. No se puede deshacer.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setConfirmDelete(null)}
+                          disabled={deleting}
+                          className="flex-1 text-sm border border-gray-200 text-gray-600 py-2.5 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRoom(room.code)}
+                          disabled={deleting}
+                          className="flex-1 text-sm bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50"
+                        >
+                          {deleting ? 'Borrando...' : 'Sí, borrar'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // ── Fila normal
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => goToRoom(room)}
+                      >
+                        <p className="font-semibold text-gray-800 truncate">{room.name}</p>
+                        <p className="text-sm text-amber-600">
+                          {room.message_count} pregunta{room.message_count !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => copyLink(room.code)}
+                        title="Copiar link"
+                        className="shrink-0 text-xs border border-gray-200 text-gray-500 px-3 py-2 rounded-lg hover:bg-gray-50 transition"
+                      >
+                        {copied ? '✓' : '🔗'}
+                      </button>
+                      <button
+                        onClick={() => goToRoom(room)}
+                        className="shrink-0 text-xs bg-amber-100 text-amber-700 px-3 py-2 rounded-lg hover:bg-amber-200 transition font-medium"
+                      >
+                        Ver
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(room.code)}
+                        title="Borrar sala"
+                        className="shrink-0 text-xs border border-gray-200 text-gray-300 hover:text-red-500 hover:border-red-200 px-2.5 py-2 rounded-lg transition"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
